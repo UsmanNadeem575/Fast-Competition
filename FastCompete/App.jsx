@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import UserSignup from './src/components/UserSignup';
@@ -9,12 +9,49 @@ import ForgetPassword from './src/components/ForgetPassword';
 import UpdatePassword from './src/components/UpdatePassword';
 import PasswordOtp from './src/components/PasswordOtp';
 import VerifiedScreen from './src/components/VerifiedScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ActivityIndicator, View } from 'react-native';
 const Stack = createStackNavigator();
 
 const App = () => {
+  const [isloggedIn,setIsLoggedIn]=useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const user_id = await AsyncStorage.getItem('user_id');
+        console.log(user_id);
+        if (user_id) {
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+        }
+      } catch (error) {
+        console.error('Error checking login:', error);
+        setIsLoggedIn(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkLoginStatus();
+  }, []);
+   if (isLoading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Signup">
+      <Stack.Navigator initialRouteName={isloggedIn ? 'Dashboard':"Signup"}>
         <Stack.Screen
           component={UserSignup}
           name="Signup"

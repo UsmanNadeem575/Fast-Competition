@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\MoodController;
 use App\Http\Controllers\SignupController;
+use App\Http\Controllers\TaskController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -34,3 +36,14 @@ Route::post('changePasswordOtp',[UserController::class, 'changePasswordOtp']);
  
 // update password
 Route::post('changePassword',[UserController::class, 'changePassword']); 
+
+
+/////////////////////////////////////////////////////////////////////
+
+Route::post('/tasks', [TaskController::class, 'store']);
+
+Route::get('/fetchTasks', [TaskController::class, 'index']);
+
+////////////////////////////////////////////////////////////////////
+
+Route::post('/updateMood', [MoodController::class, 'updateMood']);

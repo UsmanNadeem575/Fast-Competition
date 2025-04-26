@@ -84,13 +84,14 @@ const UserLogin = ({navigation}) => {
               const user_id = String(response.data.user.id);
               const username = response.data.user.username;
               const useremail = response.data.user.email;
-    
+              const tasks = response.data.user.tasks;
               const totalAmount = response.data.total_amount;
     
               await AsyncStorage.setItem('user_id', user_id);
               await AsyncStorage.setItem('username', username);
               await AsyncStorage.setItem('useremail', useremail);
-    
+              await AsyncStorage.setItem('usertasks', tasks);
+              
               navigation.navigate('Dashboard', { username, useremail, totalAmount });
               resetForm();
             } else {

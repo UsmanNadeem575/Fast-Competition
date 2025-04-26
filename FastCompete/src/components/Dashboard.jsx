@@ -1,55 +1,70 @@
-import React, {useState} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  TextInput,
-  Button,
-} from 'react-native';
+import React, {useCallback, useEffect, useState} from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Button, } from 'react-native';
 import {ProgressChart} from 'react-native-chart-kit';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import axios from 'axios';
+import API_BASE_URL from '../Api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+
+const formatDate = (date) => {
+  return new Date(date).toLocaleDateString();
+};
 
 const Dashboard = () => {
   // State Management
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      title: 'Submit SOFTEC project',
-      due: 'Today 3 PM',
-      priority: 'high',
-    },
-    {id: 2, title: 'Buy groceries', due: 'Today 6 PM', priority: 'medium'},
-  ]);
+  const [tasks, setTasks] = useState([]);
   const [mood, setMood] = useState(null);
   const [isTaskModalVisible, setTaskModalVisible] = useState(false);
   const [taskInput, setTaskInput] = useState('');
   const [isMoodModalVisible, setMoodModalVisible] = useState(false);
   const [suggestion, setSuggestion] = useState('');
 
+  
   // Mock Data
   const progressData = {
     labels: ['Completed'],
     data: [0.7],
     colors: ['#4CAF50'],
   };
-
-  // Mock API Functions
-  const mockAddTask = text => {
-    const newTask = {
-      id: Math.random(),
-      title: text.split(' ')[0], // Simple parsing
-      due: 'Tomorrow',
-      priority: 'medium',
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const userId = await getUserId();  // Retrieve the user ID from AsyncStorage
+        if (userId) {
+          const response = await axios.get(`${API_BASE_URL}/api/fetchTasks`, {
+            params: { user_id: userId },
+          });
+          if (response) {
+            const { mood, data } = response.data;  // Get mood and tasks
+            setMood(mood); // Set the mood
+            setTasks(data);  // Set tasks
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      }
     };
-    setTasks([...tasks, newTask]);
+
+    fetchTasks();
+  }, []);
+
+  
+  // Function to filter tasks based on mood
+  const getFilteredTasks = () => {
+    if (mood === 'happy') {
+      return tasks;  // Show all tasks
+    } else if (mood === 'neutral') {
+      return tasks.slice(0, Math.floor(tasks.length / 2));  // Show half the tasks
+    } else if (mood === 'sad') {
+      return tasks.slice(0, 1);  // Show only one task
+    }
+    return [];
   };
 
-  const mockAnalyzeMood = selectedMood => {
+  const mockAnalyzeMood = (selectedMood) => {
     const suggestions = {
       happy: "You're doing great! Plan something fun!",
       sad: 'Take a break and listen to music.',
@@ -58,143 +73,182 @@ const Dashboard = () => {
     return suggestions[selectedMood] || 'Keep going!';
   };
 
-  // Handlers
-  const handleAddTask = () => {
-    if (taskInput.trim()) {
-      mockAddTask(taskInput);
-      setTaskInput('');
-      setTaskModalVisible(false);
+
+
+  
+const getUserId = async () => {
+  try {
+    const userId = await AsyncStorage.getItem('user_id');
+    return userId;
+  } catch (error) {
+    console.error('Error retrieving user ID', error);
+    return null;
+  }
+};
+
+const handleAddTask = async () => {
+  if (taskInput.trim()) {
+    const userId = await getUserId();  // Retrieve the user ID from AsyncStorage
+
+    if (userId) {
+      const newTask = {
+        title: taskInput,
+        user_id: userId,  // Include the user_id in the request
+      };
+
+      try {
+        // Send the POST request to the Laravel API
+        const response = await axios.post(`${API_BASE_URL}/api/tasks`, newTask);
+
+        // If successful, add the task to the local state
+        // setTasks([response.data, ...tasks]);
+        setTaskInput(''); // Clear the input field
+        setTaskModalVisible(false); // Close the modal
+      } catch (error) {
+        console.error('Error adding task:', error);
+        // Handle any error (e.g., show a message to the user)
+      }
+    } else {
+      console.error('User ID is not available.');
+    }
+  }
+};
+
+  
+
+  // Sort tasks: high priority first, then by due date
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.priority === 'high' && b.priority !== 'high') return -1;
+    if (a.priority !== 'high' && b.priority === 'high') return 1;
+    return new Date(a.due) - new Date(b.due); 
+  });
+
+  const handleMoodSelect = async (selectedMood) => {
+    const userId = await getUserId();  // Retrieve the user ID from AsyncStorage
+  
+    if (userId) {
+      const data = {
+        user_id: userId,  // Include the user_id in the request
+        mood: selectedMood,  // Send the selected mood
+      };
+  
+      try {
+        // Send the selected mood and user_id to the Laravel API
+        const response = await axios.post(`${API_BASE_URL}/api/updateMood`, data);
+  
+        if (response.status === 200) {
+          console.log('Mood updated successfully');
+          setMood(selectedMood); // Update the local state with selected mood
+          setSuggestion(mockAnalyzeMood(selectedMood)); // Update the suggestion based on mood
+          setMoodModalVisible(false); // Close the modal
+        }
+      } catch (error) {
+        console.error('Error updating mood:', error);
+      }
     }
   };
-
-  const handleMoodSelect = selectedMood => {
-    setMood(selectedMood);
-    setSuggestion(mockAnalyzeMood(selectedMood));
-    setMoodModalVisible(false);
-  };
+  
+  
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Hello, User!</Text>
-        <TouchableOpacity>
-          {/* <Ionicons name="person-circle-outline" size={28} color="#333" /> */}
-          {/* <Fort */}
-        </TouchableOpacity>
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => setTaskModalVisible(true)}>
-          <MaterialIcons name="add-task" size={24} color="#4285F4" />
-          <Text style={styles.actionText}>Add Task</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => setMoodModalVisible(true)}>
-          <FontAwesome name="smile-o" size={24} color="#4285F4" />
-          <Text style={styles.actionText}>Log Mood</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Priority Tasks */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Priority Tasks</Text>
-        {tasks.map(task => (
-          <TaskItem key={task.id} task={task} />
-        ))}
-      </View>
-
-      {/* Progress Chart */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Your Progress</Text>
-        <ProgressChart
-          data={progressData}
-          width={300}
-          height={200}
-          strokeWidth={16}
-          radius={70}
-          chartConfig={{
-            backgroundColor: '#fff',
-            backgroundGradientFrom: '#fff',
-            backgroundGradientTo: '#fff',
-            color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-          }}
-          style={styles.chart}
-        />
-      </View>
-
-      {/* Mood Suggestion */}
-      {suggestion && (
-        <View style={styles.suggestionCard}>
-          <Ionicons name="bulb-outline" size={24} color="#FFC107" />
-          <Text style={styles.suggestionText}>{suggestion}</Text>
-        </View>
-      )}
-
-      {/* Task Input Modal */}
-      <Modal visible={isTaskModalVisible} animationType="slide">
-        <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Add New Task</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., 'Buy milk tomorrow'"
-            value={taskInput}
-            onChangeText={setTaskInput}
-          />
-          <View style={styles.modalButtons}>
-            <Button title="Cancel" onPress={() => setTaskModalVisible(false)} />
-            <Button title="Add" onPress={handleAddTask} />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Mood Selection Modal */}
-      <Modal visible={isMoodModalVisible} animationType="fade" transparent>
-        <View style={styles.moodModalContainer}>
-          <View style={styles.moodModalContent}>
-            <Text style={styles.modalTitle}>How are you feeling?</Text>
-            {['happy', 'neutral', 'sad'].map(m => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.moodOption, mood === m && styles.selectedMood]}
-                onPress={() => handleMoodSelect(m)}>
-                <Text style={styles.moodText}>
-                  {m === 'happy'
-                    ? '😊 Happy'
-                    : m === 'sad'
-                    ? '😢 Sad'
-                    : '😐 Neutral'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
+    <ScrollView style={styles.container}>
+    {/* Header */}
+    <View style={styles.header}>
+      <Text style={styles.greeting}>Hello, User!</Text>
     </View>
+
+    {/* Quick Actions */}
+    <View style={styles.quickActions}>
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={() => setTaskModalVisible(true)}>
+        <MaterialIcons name="add-task" size={24} color="#4285F4" />
+        <Text style={styles.actionText}>Add Task</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={() => setMoodModalVisible(true)}>
+        <FontAwesome name="smile-o" size={24} color="#4285F4" />
+        <Text style={styles.actionText}>Log Mood</Text>
+      </TouchableOpacity>
+    </View>
+
+    {/* Priority Tasks */}
+    <ScrollView style={styles.section}>
+      <Text style={styles.sectionTitle}>Priority Tasks</Text>
+      {getFilteredTasks().map((task) => (
+        <TaskItem key={task.id} task={task} />
+      ))}
+    </ScrollView>
+
+    {/* Mood Suggestion */}
+    {suggestion && (
+      <View style={styles.suggestionCard}>
+        <Ionicons name="bulb-outline" size={24} color="#FFC107" />
+        <Text style={styles.suggestionText}>{suggestion}</Text>
+      </View>
+    )}
+
+    {/* Task Input Modal */}
+    <Modal visible={isTaskModalVisible} animationType="slide">
+      <View style={styles.modalContainer}>
+        <Text style={styles.modalTitle}>Add New Task</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g., 'Buy milk tomorrow'"
+          value={taskInput}
+          onChangeText={setTaskInput}
+        />
+        <View style={styles.modalButtons}>
+          <Button title="Cancel" onPress={() => setTaskModalVisible(false)} />
+          <Button title="Add" onPress={handleAddTask} />
+        </View>
+      </View>
+    </Modal>
+
+    {/* Mood Selection Modal */}
+    <Modal visible={isMoodModalVisible} animationType="fade" transparent>
+      <View style={styles.moodModalContainer}>
+        <View style={styles.moodModalContent}>
+          <Text style={styles.modalTitle}>How are you feeling?</Text>
+          {['happy', 'neutral', 'sad'].map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[styles.moodOption, mood === m && styles.selectedMood]}
+              onPress={() => handleMoodSelect(m)}>
+              <Text style={styles.moodText}>
+                {m === 'happy' ? '😊 Happy' : m === 'sad' ? '😢 Sad' : '😐 Neutral'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </Modal>
+  </ScrollView>
   );
 };
 
+
 // Sub-component for Task Item
-const TaskItem = ({task}) => (
+const TaskItem = ({ task }) => (
   <View style={styles.taskItem}>
     <View
       style={[
         styles.priorityDot,
-        {backgroundColor: task.priority === 'high' ? '#F44336' : '#FFC107'},
+        { backgroundColor: task.priority === 'high' ? '#F44336' : '#FFC107' },
       ]}
     />
     <View style={styles.taskDetails}>
       <Text style={styles.taskTitle}>{task.title}</Text>
-      <Text style={styles.taskDue}>Due: {task.due}</Text>
+      <Text style={styles.taskDue}>
+        <Text>{formatDate(task.created_at)}</Text>
+      </Text>
     </View>
     <MaterialIcons name="chevron-right" size={24} color="#BDBDBD" />
   </View>
 );
+
 
 // Styles
 const styles = StyleSheet.create({
