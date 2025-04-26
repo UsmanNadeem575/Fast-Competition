@@ -3,9 +3,20 @@ import axios from 'axios';
 const API_KEY = 'AIzaSyAVaDVMB7a6Pwt3PW-8qS0kjHMCZ8SGXm4';
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-export const sendToGemini = async userMessage => {
+
+export const sendToGemini = async (userMessage, isSummary = false) => {
   try {
-    const prompt = `You are an AI assistant. Extract the following details from the given text:
+    // If it's for summarization, use the simplification prompt
+    const prompt = isSummary
+      ? `You are an AI assistant. Simplify the following text into 2-5 bullet points:
+
+Text: "${userMessage}"
+
+Return the simplified text as bullet points like this:
+- Point 1
+- Point 2
+- Point 3`
+      : `You are an AI assistant. Extract the following details from the given text:
 
 - **Title**: The main topic or task described.
 - **Due Date**: The date or time when the task/event is due or should occur ( but you have to gave it in date like if today the date is 26 april 2025 when you extract the date you have to gave it in date like 27 april 2025 or if the message has like wednesday then you have to check the date of the nearest wednesday and gave it).
@@ -20,14 +31,14 @@ Return the extracted information in the following format:
   "due_date": "<extracted due date>",
   "category": "<extracted category>",
   "priority": "<extracted priority>"
-}
-`;
+}`;
+
     const response = await axios.post(
       `${GEMINI_URL}?key=${API_KEY}`,
       {
         contents: [
           {
-            parts: [{text: prompt}],
+            parts: [{ text: prompt }],
           },
         ],
       },
@@ -35,14 +46,11 @@ Return the extracted information in the following format:
         headers: {
           'Content-Type': 'application/json',
         },
-      },
+      }
     );
 
     let reply = response.data.candidates[0]?.content?.parts[0]?.text;
-    console.log(reply);
     reply = reply.replace(/```json|```/g, '').trim();
-
-    console.log(reply);
     return reply;
   } catch (error) {
     console.error('Gemini API Error:', error.response?.data || error.message);

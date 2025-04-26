@@ -1,5 +1,5 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Button, } from 'react-native';
+import React, {useCallback, useEffect, useState,useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TextInput, Button,FlatList,Image, Animated, } from 'react-native';
 import {ProgressChart} from 'react-native-chart-kit';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -9,11 +9,15 @@ import API_BASE_URL from '../Api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { sendToGemini } from './geminiService';
-const formatDate = (date) => {
-  return new Date(date).toLocaleDateString();
-};
+import { Calendar, CalendarList, Agenda } from 'react-native-calendars';
+import { LinearGradient } from 'react-native-svg';
+import { faClockFour } from '@fortawesome/free-solid-svg-icons';
+import { useTheme } from './ThemeContext';
+
+
 
 const Dashboard = () => {
+  const {isDarkMode,toggleTheme}=useTheme();
   // State Management
   const [tasks, setTasks] = useState([]);
   const [mood, setMood] = useState(null);
@@ -21,6 +25,56 @@ const Dashboard = () => {
   const [taskInput, setTaskInput] = useState('Buy a milk tommorrow');
   const [isMoodModalVisible, setMoodModalVisible] = useState(false);
   const [suggestion, setSuggestion] = useState('');
+  const [markedDates, setMarkedDates] = useState({});
+  const [noteText, setNoteText] = useState('Education plays a critical role in shaping the future of individuals and societies. Despite its importance, many women around the world still face barriers to accessing quality education. These barriers include cultural norms, lack of financial resources, and gender discrimination. In many parts of the world, girls are expected to stay home and take care of household duties, while boys are encouraged to pursue their studies. This disparity limits women’s opportunities for personal and professional growth, perpetuating cycles of poverty and inequality. Empowering women through education not only benefits the individual but also contributes to the development of the entire community.');
+  const [summary, setSummary] = useState([]);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [isPanelVisible, setIsPanelVisible] = useState(false);
+  const [tasksForDate, setTasksForDate] = useState([]);
+  const panelTranslateY = useRef(new Animated.Value(600)).current;
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  
+  const convertTaskDate = (dueDateString) => {
+    const [day, month, year] = dueDateString.split(' ');
+    const monthIndex = monthNames.indexOf(month) + 1;
+    if (monthIndex === 0) return null; // invalid month
+    const formattedMonth = monthIndex.toString().padStart(2, '0');
+    const formattedDay = parseInt(day, 10).toString().padStart(2, '0');
+    return `${year}-${formattedMonth}-${formattedDay}`; 
+  };
+  
+  const mapTasksToCalendar = () => {
+    const marked = {};
+    tasks.forEach(task => {
+      const formattedDate =  convertTaskDate(task.due_date); 
+      console.log(formattedDate)
+      if (formattedDate) {
+        marked[formattedDate] = {
+          marked: true,
+          dotColor: 'blue',
+          activeOpacity: 0.8,
+        };
+      }
+    });
+    setMarkedDates(marked);
+  };
+  
+
+const handleSummarize = async () => {
+  const summarizedNotes = await sendToGemini(noteText, true);
+  const bulletPoints = summarizedNotes
+  .split('\n')
+  .filter(line => line.trim().startsWith('-') || line.trim().startsWith('*'))  // handle both - and *
+  .map(line => `• ${line.replace(/^[-*]\s*/, '').trim()}`)  // remove - or * and spaces
+  .join('\n');
+
+setNoteText(bulletPoints);
+
+
+};
 
   
   // Mock Data
@@ -49,19 +103,28 @@ const Dashboard = () => {
 
   useEffect(()=>{
 fetchTasks();
+mapTasksToCalendar();
   },[])
 
   
   const getFilteredTasks = () => {
+    // 1. Sort the tasks first
+    const sortedTasks = [...tasks].sort((a, b) => {
+      if (a.priority === 'high' && b.priority !== 'high') return -1;
+      if (a.priority !== 'high' && b.priority === 'high') return 1;
+      return new Date(a.due) - new Date(b.due);
+    });
+  
+    // 2. Filter based on mood
     switch (mood) {
       case 'happy':
-        return tasks;
+        return sortedTasks; // Show all tasks if happy
       case 'neutral':
-        return tasks.slice(0, Math.max(1, Math.floor(tasks.length / 2)));
+        return sortedTasks.slice(0, Math.max(1, Math.floor(sortedTasks.length / 2))); // Half tasks
       case 'sad':
-        return tasks.slice(0, 1); // Always 1 task
+        return sortedTasks.slice(0, 1); // Only 1 task
       default:
-        return tasks;
+        return sortedTasks; // Default fallback
     }
   };
   
@@ -178,13 +241,80 @@ const handleAddTask = async () => {
     }
   };
   
-  
+  const formatSelectedDate = (selectedDateString) => {
+    const date = new Date(selectedDateString); // "2025-04-27"
+    const day = date.getDate();
+    const monthName = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    return `${day} ${monthName} ${year}`;
+  };
+
+    const handleDatePress = (day) => {
+    const selected = day.dateString;
+    setSelectedDate(selected);
+    const formattedSelected = formatSelectedDate(selected);
+    console.log(formattedSelected)
+    const filteredTasks = tasks.filter(task => task.due_date === formattedSelected);
+    setTasksForDate(filteredTasks);
+
+    if (filteredTasks.length > 0) {
+      showPanel();
+    } else {
+      hidePanel();
+    }
+  };
+
+  const showPanel = () => {
+    setIsPanelVisible(true);
+    Animated.timing(panelTranslateY, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hidePanel = () => {
+    Animated.timing(panelTranslateY, {
+      toValue: 600,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsPanelVisible(false);
+      setTasksForDate([]);
+    });
+  };
+  const renderTaskItem = ({ item }) => (
+        <View style={{ marginBottom: 20 }}>
+          <LinearGradient
+            colors={['#4c669f', '#3b5998', '#192f6a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 12 }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: 'Ubuntu-Medium', fontSize: 20, color: 'white', marginBottom: 6 }}>
+                {item.title}
+              </Text>
+              <Text style={{ fontFamily: 'Ubuntu-Regular', fontSize: 14, color: 'white', opacity: 0.9 }}>
+                {item.desc}
+              </Text>
+            </View>
+            <Image
+              source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3039/3039393.png' }}
+              style={{ width: 50, height: 50, marginLeft: 10 }}
+              resizeMode="contain"
+            />
+          </LinearGradient>
+        </View>
+      );
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container,{backgroundColor:isDarkMode ? 'white':'grey'}]}>
     {/* Header */}
     <View style={styles.header}>
       <Text style={styles.greeting}>Hello, User!</Text>
+      <TouchableOpacity onPress={toggleTheme}> 
+        <Text>Change Mode</Text> </TouchableOpacity>
     </View>
 
     {/* Quick Actions */}
@@ -235,6 +365,16 @@ const handleAddTask = async () => {
           <Button title="Add" onPress={handleAddTask} />
         </View>
       </View>
+      <View style={styles.Simplifycontainer}>
+      <TextInput
+        style={styles.paragraphInput}
+        placeholder="Enter your notes here..."
+        multiline
+        value={noteText}
+        onChangeText={setNoteText}
+      />
+      <Button title="Summarize" onPress={handleSummarize} />
+      </View>
     </Modal>
 
     {/* Mood Selection Modal */}
@@ -255,12 +395,75 @@ const handleAddTask = async () => {
         </View>
       </View>
     </Modal>
-  </ScrollView>
+    
+    
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+       <Calendar
+       
+        onDayPress={handleDatePress}
+        // markedDates={{
+        //   [selectedDate]: { selected: true, marked: true, selectedColor: '#00adf5' }
+        // }}
+        markedDates={markedDates}
+        theme={{
+          selectedDayBackgroundColor: '#00adf5',
+          todayTextColor: '#00adf5',
+          arrowColor: '#00adf5',
+        }}
+      />
+
+      {isPanelVisible && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 600,
+            backgroundColor: 'white',
+            borderTopLeftRadius: 30,
+            borderTopRightRadius: 30,
+            transform: [{ translateY: panelTranslateY }],
+            padding: 25,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 6,
+            elevation: 10,
+            zIndex: 99,
+          }}
+        >
+          <Text style={{ fontFamily: 'Ubuntu-Medium', fontSize: 24, marginBottom: 20, textAlign: 'center' }}>
+            Tasks for {selectedDate}
+          </Text>
+
+          {tasksForDate.length > 0 ? (
+            <FlatList
+              data={tasksForDate}
+              renderItem={renderTaskItem}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+            />
+          ) : (
+            <Text style={{ fontSize: 16, fontFamily: 'Ubuntu-Regular', marginTop: 20, color: '#333', textAlign: 'center' }}>
+              No tasks for this date.
+            </Text>
+          )}
+
+          <TouchableOpacity
+            onPress={hidePanel}
+            style={{ marginTop: 20, alignSelf: 'center', backgroundColor: '#ed1439', paddingVertical: 10, width: '100%', borderRadius: 30 }}
+          >
+            <Text style={{ textAlign: 'center', color: '#fff', fontFamily: 'Ubuntu-Medium', fontSize: 16 }}>Close Panel</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </View>
+   </ScrollView>
   );
 };
 
-
-// Sub-component for Task Item
+// // Sub-component for Task Item
 const TaskItem = ({ task }) => (
   <View style={styles.taskItem}>
     <View
@@ -272,7 +475,10 @@ const TaskItem = ({ task }) => (
     <View style={styles.taskDetails}>
       <Text style={styles.taskTitle}>{task.title}</Text>
       <Text style={styles.taskDue}>
-        <Text>{formatDate(task.created_at)}</Text>
+        <Text>{task.due_date}</Text>
+      </Text>
+      <Text style={styles.taskDue}>
+        <Text>{task.category}</Text>
       </Text>
     </View>
     <MaterialIcons name="chevron-right" size={24} color="#BDBDBD" />
@@ -280,7 +486,7 @@ const TaskItem = ({ task }) => (
 );
 
 
-// Styles
+// // Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -413,6 +619,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  calendar: {
+        borderWidth: 1,
+        borderColor: 'gray',
+        borderRadius: 10,
+        padding: 10,
+      },
+      Simplifycontainer: {
+        flex: 1,
+        padding: 16,
+        justifyContent: 'center',
+      },
+      paragraphInput: {
+        height: 150,
+        borderColor: 'gray',
+        borderWidth: 1,
+        marginBottom: 16,
+        paddingLeft: 8,
+        textAlignVertical: 'top',
+      },
+      summaryContainer: {
+        marginTop: 16,
+        paddingHorizontal: 8,
+      },
+      heading: {
+        fontWeight: 'bold',
+        fontSize: 18,
+        marginBottom: 8,
+      },
+      summaryText: {
+        fontSize: 16,
+        marginBottom: 4,
+      },
 });
 
+
+
 export default Dashboard;
+
+

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AIController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\MoodController;
 use App\Http\Controllers\SignupController;
@@ -47,3 +48,4 @@ Route::get('/fetchTasks', [TaskController::class, 'index']);
 ////////////////////////////////////////////////////////////////////
 
 Route::post('/updateMood', [MoodController::class, 'updateMood']);
+

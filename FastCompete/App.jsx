@@ -11,9 +11,11 @@ import PasswordOtp from './src/components/PasswordOtp';
 import VerifiedScreen from './src/components/VerifiedScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, View } from 'react-native';
+import { ThemeProvider } from './src/components/ThemeContext';
 const Stack = createStackNavigator();
 
 const App = () => {
+
   const [isloggedIn,setIsLoggedIn]=useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -50,7 +52,9 @@ const App = () => {
     );
   }
   return (
-    <NavigationContainer>
+    <ThemeProvider>
+
+<NavigationContainer>
       <Stack.Navigator initialRouteName={isloggedIn ? 'Dashboard':"Signup"}>
         <Stack.Screen
           component={UserSignup}
@@ -104,9 +108,11 @@ const App = () => {
           name="VerifiedScreen"
           options={{headerShown: false}}
         />
+     
       
       </Stack.Navigator>
     </NavigationContainer>
+    </ThemeProvider>
   );
 };
 

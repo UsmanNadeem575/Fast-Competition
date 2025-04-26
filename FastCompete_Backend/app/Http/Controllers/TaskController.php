@@ -10,21 +10,21 @@ class TaskController extends Controller
 {
     public function store(Request $request)
     {
-        // Validate incoming request
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'user_id' => 'required|exists:signups,id', // Ensure that the user_id exists in the signups table
-        ]);
-    
-        // Create the task with the validated data
         $task = Task::create([
-            'user_id' => $validated['user_id'],
-            'title' => $validated['title'],
+            'user_id'   => $request->user_id,
+            'title'     => $request->title,
+            'due_date'  => $request->due_date, 
+            'category'  => $request->category,
+            'priority'  => $request->priority,
         ]);
     
-        // Return the created task as a response
-        return response()->json($task, 201);
+        if ($task) {
+            return response()->json(['message' => 'Success'], 200);  // Fixed response format
+        } else {
+            return response()->json(['message' => 'Failed to store task'], 400);  // Fixed response format
+        }
     }
+
 
     public function index(Request $request)
     {
@@ -33,15 +33,27 @@ class TaskController extends Controller
 
         $userId = $request->user_id;
 
-    // Retrieve the user's mood
-    $mood = Mood::where('user_id', $userId)->orderBy('created_at', 'desc')->first();
+        // Retrieve the user's mood
+        $mood = Mood::where('user_id', $userId)->orderBy('created_at', 'desc')->first();
 
-    // Fetch tasks for the user
-    $tasks = Task::where('user_id', $userId)->get();
+        // Fetch tasks for the user
+        $tasks = Task::where('user_id', $userId)->get();
 
-    return response()->json([
-        'mood' => $mood ? $mood->mood : 'neutral',  // Return mood (default to neutral if not found)
-        'data' => $tasks,
-    ]);
+        return response()->json([
+            'mood' => $mood,  // Return mood (default to neutral if not found)
+            'data' => $tasks,
+        ]);
     }
 }
+
+
+
+        // // Validate incoming request
+        // $validated = $request->validate([
+        //     'user_id'   => 'required|exists:signups,id', // Validate user_id exists in the signups table
+        //     'title'     => 'required|string|max:255', // Validate title
+        //     'due_date'  => 'required|date', // Validate due_date as a proper date
+        //     'category'  => 'required|string|max:255', // Validate category
+        //     'priority'  => 'required|string|max:255', // Validate priority
+        // ]);
+    

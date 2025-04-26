@@ -14,9 +14,12 @@ return new class extends Migration
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id');
-            $table->foreign('user_id')->references('id')->on('signups')->onDelete('cascade');
-            $table->string('title');
-            $table->timestamps();
+            $table->foreign('user_id') ->references('id') ->on('signups');
+            $table->string('title');  // Added column for the task title
+            $table->string('due_date'); // Column for the due date
+            $table->string('category'); // Column for category
+            $table->string('priority'); // Column for priority
+            $table->timestamps(); // Laravel's default created_at and updated_at
         });
     }
 
