@@ -72,10 +72,20 @@ const App = () => {
         <Stack.Screen component={Dashboard} name="Dashboard" options={{headerShown: false}} />
       
         <Stack.Screen
-          component={ForgetPassword}
           name="ForgetPassword"
-          options={{headerShown: false}}
+          component={ForgetPassword}
+          options={{
+            headerShown: true,
+            title: '',
+            headerStyle: {
+              backgroundColor: 'white',
+              elevation: 0,
+              shadowOpacity: 0, 
+              borderBottomWidth: 0, 
+            },
+          }}
         />
+
       
         <Stack.Screen
           component={PasswordOtp}

@@ -4,7 +4,7 @@ import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import { faEnvelope, faLock, faEye, faEyeSlash, faExclamationCircle, } from '@fortawesome/free-solid-svg-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// import LottieView from "lottie-react-native";
+import LottieView from "lottie-react-native";
 import API_BASE_URL from '../Api';
 
 const UserLogin = ({navigation}) => {
@@ -295,16 +295,16 @@ const UserLogin = ({navigation}) => {
       </View>
 
       {/* Loader Modal */}
-      {/* <Modal transparent visible={visible} animationType="fade">
+      <Modal transparent visible={visible} animationType="fade">
         <View style={styles.loaderContainer}>
           <LottieView
-            source={require("../../public/loader.json")}
+            source={require('../assets/loader.json')}
             autoPlay
             loop
             style={styles.loader}
           />
         </View>
-      </Modal> */}
+      </Modal>
     
     </View>
   );

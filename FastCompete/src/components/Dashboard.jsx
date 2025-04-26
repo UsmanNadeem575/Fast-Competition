@@ -8,7 +8,7 @@ import axios from 'axios';
 import API_BASE_URL from '../Api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-
+import { sendToGemini } from './geminiService';
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString();
 };
@@ -18,7 +18,7 @@ const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [mood, setMood] = useState(null);
   const [isTaskModalVisible, setTaskModalVisible] = useState(false);
-  const [taskInput, setTaskInput] = useState('');
+  const [taskInput, setTaskInput] = useState('Buy a milk tommorrow');
   const [isMoodModalVisible, setMoodModalVisible] = useState(false);
   const [suggestion, setSuggestion] = useState('');
 
@@ -29,40 +29,43 @@ const Dashboard = () => {
     data: [0.7],
     colors: ['#4CAF50'],
   };
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const userId = await getUserId();  // Retrieve the user ID from AsyncStorage
-        if (userId) {
-          const response = await axios.get(`${API_BASE_URL}/api/fetchTasks`, {
-            params: { user_id: userId },
-          });
-          if (response) {
-            const { mood, data } = response.data;  // Get mood and tasks
-            setMood(mood); // Set the mood
-            setTasks(data);  // Set tasks
-          }
+  const fetchTasks = async () => {
+    try {
+      const userId = await getUserId();  // Retrieve the user ID from AsyncStorage
+      if (userId) {
+        const response = await axios.get(`${API_BASE_URL}/api/fetchTasks`, {
+          params: { user_id: userId },
+        });
+        if (response) {
+          const { mood, data } = response.data;  
+          setMood(mood); // Set the mood
+          setTasks(data);  // Set tasks
         }
-      } catch (error) {
-        console.error('Error fetching tasks:', error);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  };
 
-    fetchTasks();
-  }, []);
+  useEffect(()=>{
+fetchTasks();
+  },[])
 
   
-  // Function to filter tasks based on mood
   const getFilteredTasks = () => {
-    if (mood === 'happy') {
-      return tasks;  // Show all tasks
-    } else if (mood === 'neutral') {
-      return tasks.slice(0, Math.floor(tasks.length / 2));  // Show half the tasks
-    } else if (mood === 'sad') {
-      return tasks.slice(0, 1);  // Show only one task
+    switch (mood) {
+      case 'happy':
+        return tasks;
+      case 'neutral':
+        return tasks.slice(0, Math.max(1, Math.floor(tasks.length / 2)));
+      case 'sad':
+        return tasks.slice(0, 1); // Always 1 task
+      default:
+        return tasks;
     }
-    return [];
   };
+  
+  
 
   const mockAnalyzeMood = (selectedMood) => {
     const suggestions = {
@@ -73,7 +76,20 @@ const Dashboard = () => {
     return suggestions[selectedMood] || 'Keep going!';
   };
 
+  const handleSend = async inputText => {
+    try {
+      const reply = await sendToGemini(inputText);
+      const cleanedString = reply
+        .replace(/^\\\` json /, '')
+        .replace(/\\\`$/, '')
+        .trim();
 
+      const parsedObject = JSON.parse(cleanedString);
+      return parsedObject;
+    } catch (error) {
+      console.error('Error extracting task details:', error);
+    }
+  };
 
   
 const getUserId = async () => {
@@ -88,31 +104,45 @@ const getUserId = async () => {
 
 const handleAddTask = async () => {
   if (taskInput.trim()) {
+    const data = await handleSend(taskInput);  // Assuming this returns a cleaned version of task title
     const userId = await getUserId();  // Retrieve the user ID from AsyncStorage
 
     if (userId) {
       const newTask = {
-        title: taskInput,
-        user_id: userId,  // Include the user_id in the request
+        user_id: userId, 
+        title:data.title,  
+        due_date:data.due_date,                // Set the title to the value received from the input
+        category:data.category,                // Set the title to the value received from the input
+        priority:data.priority,                // Set the title to the value received from the input
       };
-
+      
       try {
         // Send the POST request to the Laravel API
         const response = await axios.post(`${API_BASE_URL}/api/tasks`, newTask);
 
-        // If successful, add the task to the local state
-        // setTasks([response.data, ...tasks]);
-        setTaskInput(''); // Clear the input field
-        setTaskModalVisible(false); // Close the modal
+        if (response.status === 200) {
+          setTaskInput('');               // Clear the input field
+          setTaskModalVisible(false);     // Close the modal
+          fetchTasks();
+          alert('Task added successfully!'); // Show success message
+        } else {
+          console.error('Failed to add task:', response.data.message);
+          alert('Failed to add task: ' + response.data.message);  // Show error message
+        }
       } catch (error) {
         console.error('Error adding task:', error);
-        // Handle any error (e.g., show a message to the user)
+        alert('An error occurred. Please try again.');  // Show error message to user
       }
     } else {
       console.error('User ID is not available.');
+      alert('User ID is not available. Please log in.');  // Show error message
     }
+  } else {
+    console.error('Task input is empty.');
+    alert('Please enter a task title.');  // Show error message
   }
 };
+
 
   
 

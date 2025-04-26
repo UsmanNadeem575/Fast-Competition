@@ -329,7 +329,7 @@ const UserSignup = ({navigation}) => {
           </View>
         </View> */}
 
-         <View style={{marginTop:50}}>
+         <View style={{marginVertical:30}}>
             <TouchableOpacity style={styles.googleBtn}>
                 <Image source={{uri:'https://cdn-icons-png.freepik.com/256/2504/2504739.png?ga=GA1.1.1031720790.1731643223&semt=ais_hybrid'}} style={{ width: 30, height: 30, marginRight: 10}}></Image>
                 <Text style={[styles.btnText,{color:'black'}]}>Sign Up with Google</Text>
@@ -340,7 +340,6 @@ const UserSignup = ({navigation}) => {
           <Text
             style={{
               fontSize: 20,
-              marginTop: 20,
               color: '#777784',
               fontWeight: '500',
             }}>
@@ -351,7 +350,6 @@ const UserSignup = ({navigation}) => {
               style={{
                 color: '#4A00E0',
                 fontSize: 20,
-                marginTop: 20,
                 fontWeight: '500',
               }}>
               Login
@@ -397,7 +395,7 @@ const styles = StyleSheet.create({
   },
 
   headingContainer: {
-    marginTop: '30',
+    marginTop: '50',
   },
 
   // gradientButton: {

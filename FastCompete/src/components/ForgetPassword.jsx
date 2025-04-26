@@ -110,6 +110,7 @@ const styles = StyleSheet.create({
         marginHorizontal:30,
         marginTop:40,
         elevation:1,
+        borderRadius: 12,
         
     },
       
@@ -125,7 +126,8 @@ const styles = StyleSheet.create({
     },
 
     nextBtn:{
-        backgroundColor:'#d92046',
+        backgroundColor:'#4A00E0',
+        borderRadius: 12,
         paddingHorizontal:20,
         paddingVertical:7,
         marginHorizontal:30,
